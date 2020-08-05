@@ -1,10 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <string>
-
-
-
-double PI = 3.14159265358979;
+#define PI 3.14159265358979
 
 struct Vector2D {
 
@@ -87,23 +84,16 @@ struct Vector3D {
 	}
 };
 
-/*
-DEVELOPMENT NOTE:
-POSSIBLY USE LESS OF CALCLUS CLASS WITH METHODS, AND CREATE INTERGRAL OBJECTS? ABILITY TO ADD INTEGRALS. BUT THEY CAN BE INTEGRATED AND FUNCTIONS ADDED AFTERWARDS. 
-DONT FORGET TO OVERLOAD OPERATORS TO BEST OF ABILITY 
-DIVIDE BY ZERO GIVES ERROR WITH MSVC->CHECK DENOMINATOR FOR NEGATIVE POWERS IN MONOMIALS AS WELL AS COMPOSITE FUNCTIONS
-*/
-
 class Function {
 public:
 	virtual double evaluate(double x) const = 0;
 	virtual Function* differentiate() const = 0;
 	//virtual Function* antidifferentiate() const = 0;
 
-    virtual ~Function() = 0;
+	virtual ~Function() = 0;
 };
 
-Function::~Function(){printf("Function Destructor Called!\n");}
+Function::~Function() { printf("Function Destructor Called!\n"); }
 
 class Monomial : public Function {
 public:
@@ -112,7 +102,7 @@ public:
 		coefficient = c;
 		power = p;
 	}
-	~Monomial(){printf("Monomial Destructor Called!\n");}
+	~Monomial() { printf("Monomial Destructor Called!\n"); }
 
 	std::string toString() {
 		if (power == 0)
@@ -126,9 +116,9 @@ public:
 		else
 			return std::to_string(coefficient) + "*x^" + std::to_string(power);
 	}
-	 
+
 	double evaluate(double x) const {
-		if (power < 0 && x == 0) 
+		if (power < 0 && x == 0)
 			return -INFINITY;
 		else if (fmod(abs(power), 2) == 0 && x < 0)
 			return NAN;
@@ -137,10 +127,10 @@ public:
 	}
 
 	Function* differentiate() const {
-		return new Monomial(power * coefficient, power-1);
+		return new Monomial(power * coefficient, power - 1);
 	}
 
-	
+
 };
 
 class PolyFunction : public Function {
@@ -200,7 +190,7 @@ public:
 	}
 
 
-	
+
 };
 
 
@@ -213,8 +203,8 @@ int main()
 		delete mon2;
 		std::cout << "Test message";
 	}
-	
-	
+
+
 
 
 	return 0;
