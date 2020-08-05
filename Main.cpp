@@ -1,7 +1,8 @@
 #include <iostream>
 #include <math.h>
 #include <string>
-#define PI 3.14159265358979
+constexpr double PI = 3.14159265358979;
+constexpr double NaN = ((static_cast<double>(INFINITY)) * 0);
 
 struct Vector2D {
 
@@ -34,7 +35,6 @@ struct Vector2D {
 	Vector2D vectorProject(const Vector2D& input) const {
 		return Vector2D(((*this) * (dotProduct(input) / pow(r, 2))).x, ((*this) * (dotProduct(input) / pow(r, 2))).y);
 	}
-
 };
 
 struct Vector3D {
@@ -84,25 +84,22 @@ struct Vector3D {
 	}
 };
 
-class Function {
-public:
+struct Function {
 	virtual double evaluate(double x) const = 0;
 	virtual Function* differentiate() const = 0;
-	//virtual Function* antidifferentiate() const = 0;
-
+	virtual Function* antidifferentiate() const = 0;
 	virtual ~Function() = 0;
 };
 
-Function::~Function() { printf("Function Destructor Called!\n"); }
+Function::~Function() {}
 
-class Monomial : public Function {
-public:
+struct Monomial : public Function {
 	double coefficient, power;
 	Monomial(double c, double p) {
 		coefficient = c;
 		power = p;
 	}
-	~Monomial() { printf("Monomial Destructor Called!\n"); }
+	~Monomial() {}
 
 	std::string toString() {
 		if (power == 0)
@@ -121,24 +118,21 @@ public:
 		if (power < 0 && x == 0)
 			return -INFINITY;
 		else if (fmod(abs(power), 2) == 0 && x < 0)
-			return NAN;
+			return NaN;
 		else
 			return coefficient * pow(x, power);
 	}
 
 	Function* differentiate() const {
-		return new Monomial(power * coefficient, power - 1);
+		return new Monomial(coefficient * power, power - 1);
 	}
-
+	Function* antidifferentiate() const {
+		return new Monomial(coefficient / power, power + 1);
+	}
 
 };
 
 class PolyFunction : public Function {
-
-
-
-
-
 
 };
 
@@ -193,20 +187,8 @@ public:
 
 };
 
-
-
 int main()
 {
-	{
-		Monomial mon1(1, 2);
-		Function* mon2 = mon1.differentiate();
-		delete mon2;
-		std::cout << "Test message";
-	}
-
-
-
-
 	return 0;
 }
 
