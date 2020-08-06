@@ -1,6 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <vector>
 constexpr double PI = 3.14159265358979;
 constexpr double NaN = ((static_cast<double>(INFINITY)) * 0);
 
@@ -8,9 +9,7 @@ struct Vector2D {
 
 	double x, y, r, theta;
 
-	Vector2D(double x, double y) {
-		this->x = x;
-		this->y = y;
+	Vector2D(double x, double y) : x(x), y(y)  {
 		r = sqrt(pow(x, 2) + pow(y, 2));
 		theta = (180 / PI) * atan2(y, x);
 	}
@@ -41,10 +40,7 @@ struct Vector3D {
 
 	double x, y, z, r, theta, phi;
 
-	Vector3D(double x, double y, double z) {
-		this->x = x;
-		this->y = y;
-		this->z = z;
+	Vector3D(double x, double y, double z) : x(x), y(y), z(z) {
 		r = sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
 		phi = (180 / PI) * atan2(y, x);
 		theta = (180 / PI) * acos(z / r);
@@ -58,6 +54,7 @@ struct Vector3D {
 		phi = other.phi;
 		printf("Copied!\n");
 	}
+
 	void printVector() {
 		std::cout << ("Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + ", Component z: " + std::to_string(z) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + ", Angle phi: " + std::to_string(phi) + "\n");
 	}
@@ -87,7 +84,8 @@ struct Vector3D {
 struct Function {
 	virtual double evaluate(double x) const = 0;
 	virtual Function* differentiate() const = 0;
-	virtual Function* antidifferentiate() const = 0;
+	virtual Function* antiDifferentiate() const = 0;
+	virtual std::string toString() const = 0;
 	virtual ~Function() = 0;
 };
 
@@ -95,13 +93,12 @@ Function::~Function() {}
 
 struct Monomial : public Function {
 	double coefficient, power;
-	Monomial(double c, double p) {
-		coefficient = c;
-		power = p;
-	}
+
+	Monomial(double c, double p) : coefficient(c), power(p) {}
+
 	~Monomial() {}
 
-	std::string toString() {
+	std::string toString() const {
 		if (power == 0)
 			return std::to_string(coefficient);
 		else if (coefficient == 0)
@@ -125,19 +122,54 @@ struct Monomial : public Function {
 
 	Function* differentiate() const {
 		return new Monomial(coefficient * power, power - 1);
-	}
-	Function* antidifferentiate() const {
+	} 
+	Function* antiDifferentiate() const {
 		return new Monomial(coefficient / power, power + 1);
 	}
-
 };
 
-class PolyFunction : public Function {
+struct PolyFunction : public Function {
+	std::vector<Function*> polyfunc;
 
+	PolyFunction(const std::vector<Function*>& terms) : polyfunc(terms) {}
+
+	~PolyFunction() {}
+
+	std::string toString() const {
+		std::string expression;
+		for (unsigned int i = 0; i < polyfunc.size(); i++) {
+			if (i != polyfunc.size() - 1)
+				expression += polyfunc[i]->toString() + "+";
+			else
+				expression += polyfunc[i]->toString();
+		}
+		return expression;
+	}
+
+	virtual double evaluate(double x) const {
+		double total = 0;
+		for (unsigned int i = 0; i < polyfunc.size(); i++)
+			total += polyfunc[i]->evaluate(x);
+		return total;
+	}
+
+	Function* differentiate() const {
+		std::vector<Function*> polyfuncderiv(polyfunc.size());
+		for (unsigned int i = 0; i < polyfunc.size(); i++)
+			polyfuncderiv[i] = polyfunc[i]->differentiate();
+		return new PolyFunction(polyfuncderiv);
+	}
+
+	Function* antiDifferentiate() const {
+		std::vector<Function*> polyfuncantideriv(polyfunc.size());
+		for (unsigned int i = 0; i < polyfunc.size(); i++)
+			polyfuncantideriv[i] = polyfunc[i]->antiDifferentiate();
+		return new PolyFunction(polyfuncantideriv);
+	}
 };
 
-class Calculus {
-public:
+struct Calculus {
+
 	static double Limit(const Function& func, double x) {
 		double evaluation = func.evaluate(x);
 		if (isnan(evaluation))
@@ -182,10 +214,9 @@ public:
 		else
 			return evaluation;
 	}
-
-
-
 };
+
+
 
 int main()
 {
