@@ -1,7 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <string>
-#include <vector>
+#include <array>
 constexpr double PI = 3.14159265358979;
 constexpr double NaN = ((static_cast<double>(INFINITY)) * 0);
 
@@ -22,8 +22,8 @@ struct Vector2D {
 	Vector2D operator*(double scalar) const {
 		return Vector2D(x * scalar, y * scalar);
 	}
-	void printVector() {
-		std::cout << ("Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + "\n");
+	std::string toString () {
+		return "Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + "\n";
 	}
 	double dotProduct(const Vector2D& input) const {
 		return (x * input.x) + (y * input.y);
@@ -55,8 +55,8 @@ struct Vector3D {
 		printf("Copied!\n");
 	}
 
-	void printVector() {
-		std::cout << ("Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + ", Component z: " + std::to_string(z) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + ", Angle phi: " + std::to_string(phi) + "\n");
+	std::string toString() {
+		return "Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + ", Component z: " + std::to_string(z) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + ", Angle phi: " + std::to_string(phi) + "\n";
 	}
 	Vector3D operator+(const Vector3D& input) const {
 		return Vector3D(x + input.x, y + input.y, z + input.z);
@@ -81,94 +81,406 @@ struct Vector3D {
 	}
 };
 
-struct Function {
+struct FuncBase {
 	virtual double evaluate(double x) const = 0;
-	virtual Function* differentiate() const = 0;
-	virtual Function* antiDifferentiate() const = 0;
+	virtual FuncBase* differentiate() = 0;
+	virtual FuncBase* antiDifferentiate() = 0;
+	virtual FuncBase* Copy() = 0;
 	virtual std::string toString() const = 0;
-	virtual ~Function() = 0;
+	virtual ~FuncBase() = 0;
 };
 
-Function::~Function() {}
+FuncBase::~FuncBase() {}
 
-struct Monomial : public Function {
-	double coefficient, power;
+struct Function : public FuncBase{
+private:
+	struct Monomial : public FuncBase {
+		double coefficient, power;
 
-	Monomial(double c, double p) : coefficient(c), power(p) {}
+		Monomial(double c, double p) : coefficient(c), power(p) {}
 
-	~Monomial() {}
+		~Monomial(){}
 
-	std::string toString() const {
-		if (power == 0)
-			return std::to_string(coefficient);
-		else if (coefficient == 0)
-			return "";
-		else if (power == 1 && coefficient == 1)
-			return "x";
-		else if (power == 1)
-			return std::to_string(coefficient) + "x";
+		Monomial(const Monomial& other) :coefficient(other.coefficient), power(other.power) {}
+
+		FuncBase* Copy() {
+			return new Monomial(*this);
+		}
+
+		std::string toString() const {
+			if (power == 0)
+				return std::to_string(coefficient);
+			else if (coefficient == 0)
+				return "";
+			else if (power == 1 && coefficient == 1)
+				return "x";
+			else if (power == 1)
+				return std::to_string(coefficient) + "x";
+			else
+				return std::to_string(coefficient) + "*x^" + std::to_string(power);
+		}
+
+		
+		double evaluate(double x) const {
+			if (power < 0 && x == 0)
+				return -INFINITY;
+			else if (fmod(abs(power), 2) == 0 && x < 0)
+				return NaN;
+			else
+				return coefficient * pow(x, power);
+		}
+
+		FuncBase* differentiate() {
+			return new Monomial(coefficient * power, power - 1);
+		}
+		FuncBase* antiDifferentiate() {
+			return new Monomial(coefficient / (power+1), power + 1);
+		}
+
+	};
+
+	struct Exponential : public FuncBase {
+		double coefficient, base;
+		Exponential(double c, double b) : coefficient(c), base(b) {}
+
+		~Exponential() {}
+
+		Exponential(const Exponential& other) : coefficient(other.coefficient), base(other.base) {}
+
+		FuncBase* Copy() {
+			return new Exponential(*this);
+		}
+
+		std::string toString() const {
+			if (coefficient == 1)
+				return std::to_string(base) + "^x";
+			else
+				return std::to_string(coefficient) + "*" + std::to_string(base) + "^x";
+		}
+
+		double evaluate(double x) const {
+			return coefficient * pow(base, x);
+		}
+		FuncBase* differentiate() {
+			return new Exponential(coefficient * log(base), base);
+		}
+
+		FuncBase* antiDifferentiate() {
+			return new Exponential(coefficient / log(base), base);
+		}
+	};
+
+	struct Logarithm : public FuncBase {
+		double coefficient;
+		Logarithm(double c) : coefficient(c) {}
+
+		~Logarithm() {}
+
+		Logarithm(const Exponential& other) : coefficient(other.coefficient) {}
+
+		FuncBase* Copy() {
+			return new Logarithm(*this);
+		}
+
+		std::string toString() const {
+			if (coefficient == 1)
+				return "ln(x)";
+			else
+				return std::to_string(coefficient) + "*ln(x)";
+		}
+
+		double evaluate(double x) const {
+			return coefficient * log(x);
+		}
+
+		FuncBase* differentiate() {
+			return new Monomial(1, -1);
+		}
+
+		FuncBase* antiDifferentiate() {
+			Function* fptr1 = new Function();
+			fptr1->addMode = false;
+			fptr1->addMonomial(1, 1);
+			fptr1->addLogarithm(1);
+			Function* fptr2 = new Function();
+			fptr2->addMonomial(-1, 1);
+			return new Function[2]{*fptr1,*fptr2};
+		}
+	};
+
+	struct Trigonmetric : public FuncBase {
+		double coefficient;
+		char type;
+		Trigonmetric(double c, char t) : coefficient(c), type(t) {
+			if ((type != 's') && (type != 'c'))
+				throw std::exception("Value of 'char type' must be either 's', 'c',!");
+		}
+
+		~Trigonmetric() {}
+
+		Trigonmetric(const Trigonmetric& other) : coefficient(other.coefficient), type(other.type){}
+
+		FuncBase* Copy() {
+			return new Trigonmetric(*this);
+		}
+
+		std::string toString() const {
+			if (coefficient == 1) {
+				if (type == 's')
+					return "sin(x)";
+				else 
+					return "cos(x)";
+			}
+			else
+				if (type == 's')
+					return std::to_string(coefficient) + "*sin(x)";
+				else 
+					return std::to_string(coefficient) + "*cos(x)";
+		}
+
+
+
+		double evaluate(double x) const {
+			if (type == 's')
+				return coefficient * sin(x);
+			else
+				return coefficient * cos(x);
+		}
+		
+		FuncBase* differentiate() {
+			if (type == 's')
+				return new Trigonmetric(1, 'c');
+			else
+				return new Trigonmetric(-1, 's');
+		}
+
+		FuncBase* antiDifferentiate() {
+			if (type == 's')
+				return new Trigonmetric(-1, 'c');
+			else
+				return new Trigonmetric(1, 's');
+		}
+	};
+
+	struct AbsoluteValue : public FuncBase {
+		double coefficient;
+		AbsoluteValue(double c) : coefficient(c) {}
+
+		~AbsoluteValue() {}
+
+		AbsoluteValue(const AbsoluteValue& other) : coefficient(other.coefficient){}
+
+		FuncBase* Copy() {
+			return new AbsoluteValue(*this);
+		}
+
+		std::string toString() const {
+			if (coefficient == 1)
+				return "|x|";
+			else
+				return std::to_string(coefficient) + "*|x|";
+		}
+
+		double evaluate(double x) const {
+			return coefficient * abs(x);
+		}
+
+		FuncBase* differentiate() {
+			Function* fptr = new Function();
+			fptr->addMode = false;
+			fptr->addMonomial(1, -1);
+			fptr->addAbsoluteValue(1);
+			return fptr;
+		}
+
+		FuncBase* antiDifferentiate() {
+			Function* fptr = new Function();
+			fptr->addMode = false;
+			fptr->addMonomial(.5, 1);
+			fptr->addAbsoluteValue(1);
+			return fptr;
+		}
+	};
+
+	//struct Composite : public FuncBase{};
+
+	void addFunc(FuncBase* func) {
+		if (fcount < 5) {
+			functions[fcount] = func;
+			fcount++;
+		}
 		else
-			return std::to_string(coefficient) + "*x^" + std::to_string(power);
+			printf("This function is full!\n");
+	}
+	
+	Function* dsubgroup1; 
+	Function* dsubgroup2; 
+	bool derivGarbage = false;
+	bool differeniated = false;
+	bool integrated = false;
+public:
+	unsigned short int fcount = 0;
+	std::array<FuncBase*, 5> functions;
+	bool addMode = true; //False is multiply
+
+	Function() {
+		for (unsigned short int i = 0; i < 5; i++)
+			functions[i] = 0;
+	}
+
+	~Function() {
+		for (unsigned short int i = 0; i < fcount; i++) 
+			if (functions[i] != 0) {
+				delete functions[i];
+				functions[i] = 0;
+			}
+		if (derivGarbage) {
+			dsubgroup1 = 0;
+			dsubgroup2 = 0;
+		}
+	}
+
+	Function(const Function& other)  {
+		derivGarbage = other.derivGarbage;
+		differeniated = other.differeniated;
+		integrated = other.integrated;
+		fcount = other.fcount;
+		functions = other.functions;
+		addMode = other.addMode;
+		if (other.dsubgroup1) {
+			dsubgroup1 = new Function(*(other.dsubgroup1));
+			dsubgroup2 = new Function(*(other.dsubgroup2));
+		}
+
+	}
+
+	FuncBase* Copy() {
+		return new Function(*this);
+	}
+
+	void addMonomial(double c, double p) {
+		if (fcount < 5) {
+			functions[fcount] = new Monomial(c,p);
+			fcount++;
+		}
+		else
+			printf("This function is full!\n");
+	}
+
+	void addExponential(double c, double b) {
+		if (fcount < 5) {
+			functions[fcount] = new Exponential(c, b);
+			fcount++;
+		}
+		else
+			printf("This function is full!\n");
+	}
+
+	void addLogarithm(double c) {
+		if (fcount < 5) {
+			functions[fcount] = new Logarithm(c);
+			fcount++;
+		}
+		else
+			printf("This function is full!\n");
+	}
+
+	void addTrigonmetric(double c, char t) {
+		if (fcount < 5) {
+			functions[fcount] = new Trigonmetric(c,t);
+			fcount++;
+		}
+		else
+			printf("This function is full!\n");
+	}
+
+	void addAbsoluteValue(double c){
+		if (fcount < 5) {
+			functions[fcount] = new AbsoluteValue(c);
+			fcount++;
+		}
+		else
+			printf("This function is full!");
 	}
 
 	double evaluate(double x) const {
-		if (power < 0 && x == 0)
-			return -INFINITY;
-		else if (fmod(abs(power), 2) == 0 && x < 0)
-			return NaN;
-		else
-			return coefficient * pow(x, power);
-	}
-
-	Function* differentiate() const {
-		return new Monomial(coefficient * power, power - 1);
-	} 
-	Function* antiDifferentiate() const {
-		return new Monomial(coefficient / power, power + 1);
-	}
-};
-
-struct PolyFunction : public Function {
-	std::vector<Function*> polyfunc;
-
-	PolyFunction(const std::vector<Function*>& terms) : polyfunc(terms) {}
-
-	~PolyFunction() {}
-
-	std::string toString() const {
-		std::string expression;
-		for (unsigned int i = 0; i < polyfunc.size(); i++) {
-			if (i != polyfunc.size() - 1)
-				expression += polyfunc[i]->toString() + "+";
-			else
-				expression += polyfunc[i]->toString();
-		}
-		return expression;
-	}
-
-	virtual double evaluate(double x) const {
 		double total = 0;
-		for (unsigned int i = 0; i < polyfunc.size(); i++)
-			total += polyfunc[i]->evaluate(x);
+		if (addMode)
+			for (unsigned short int i = 0; i < fcount; i++)
+				if (i != 0)
+					total += functions[i]->evaluate(x);
+		else
+			for (unsigned short int i = 0; i < fcount; i++)
+				if (i != 0)
+					total *= functions[i]->evaluate(x);
 		return total;
 	}
 
-	Function* differentiate() const {
-		std::vector<Function*> polyfuncderiv(polyfunc.size());
-		for (unsigned int i = 0; i < polyfunc.size(); i++)
-			polyfuncderiv[i] = polyfunc[i]->differentiate();
-		return new PolyFunction(polyfuncderiv);
+	std::string toString() const {
+		std::string output;
+		if (addMode) 
+			for (unsigned short int i = 0; i < fcount; i++) {
+				if (i != 0)
+					output += "+" + functions[i]->toString();
+				else
+					output += functions[i]->toString();
+			}
+		else
+			for (unsigned short int i = 0; i < fcount; i++) {
+				if (i != 0)
+					output += "*" + functions[i]->toString();
+				else
+					output += functions[i]->toString();
+			}
+		return output;
 	}
 
-	Function* antiDifferentiate() const {
-		std::vector<Function*> polyfuncantideriv(polyfunc.size());
-		for (unsigned int i = 0; i < polyfunc.size(); i++)
-			polyfuncantideriv[i] = polyfunc[i]->antiDifferentiate();
-		return new PolyFunction(polyfuncantideriv);
+	Function* differentiate() {
+		Function* derivative = new Function();
+
+		if (addMode) {
+			for(unsigned short int i = 0; i < fcount; i++)
+				derivative->addFunc(functions[i]->differentiate());
+			return derivative;
+		}
+		else {
+			if (fcount == 2 && !differeniated) {
+				differeniated = true;
+				derivGarbage = true;
+				dsubgroup1 = new Function();
+				dsubgroup1->addFunc(functions[0]->differentiate());
+				dsubgroup1->addFunc(functions[1]->Copy());
+				dsubgroup1->addMode = false;
+				dsubgroup2 = new Function();
+				dsubgroup2->addFunc(functions[1]->differentiate());
+				dsubgroup2->addFunc(functions[0]->Copy());
+				dsubgroup2->addMode = false;
+				derivative->addFunc(dsubgroup1);
+				derivative->addFunc(dsubgroup2);
+				return derivative;
+			}
+			else
+				throw std::exception();
+		}
 	}
+
+	//ANTIDIFFERENTIATION NOT FULLY SUPPORTED
+
+	Function* antiDifferentiate(){
+		Function* antiDerivative = new Function();
+		if (addMode) {
+			for (unsigned short int i = 0; i < fcount; i++)
+				antiDerivative->addFunc(functions[i]->antiDifferentiate());
+			return antiDerivative;
+		}
+		else {
+			throw std::exception();
+		}
+	}
+
 };
 
-struct Calculus {
+/*struct Calculus {
 
 	static double Limit(const Function& func, double x) {
 		double evaluation = func.evaluate(x);
@@ -214,8 +526,7 @@ struct Calculus {
 		else
 			return evaluation;
 	}
-};
-
+};*/ 
 
 
 int main()
