@@ -1,10 +1,11 @@
 #include <iostream>
-#include <iomanip>
 #include <math.h>
 #include <string>
 #include <array>
 constexpr double PI = 3.14159265358979;
 constexpr double NaN = ((static_cast<double>(INFINITY)) * 0);
+
+static int funcdeletions = 0;
 
 struct Vector2D {
 
@@ -391,14 +392,9 @@ private:
 			std::cout << "This function is full!\n";
 	}
 	
-	Function* derivative = 0;
-	Function* dsubgroup1 = 0; 
-	Function* dsubgroup2 = 0; 
-	bool differentiated = false;
-	bool antiDifferentiated = false;
 public:
-	unsigned int fcount = 0;
 	std::array<FuncBase*, 5> functions;
+	unsigned int fcount = 0;
 	bool addMode = true; //False is multiply
 
 
@@ -408,22 +404,14 @@ public:
 	}
 
 	~Function() {
-		for (unsigned int i = 0; i < fcount; i++) 
-			if (functions[i] != 0) {
-				delete functions[i];
-				functions[i] = 0;
-			}
-		if (differentiated) {	
-			dsubgroup1 = 0;
-			dsubgroup2 = 0;
-		}
+	for (unsigned int i = 0; i < fcount; i++) 
+		if (functions[i] != 0) {
+			delete functions[i];
+			functions[i] = 0;
+		}				
 	}
 
 	Function(const Function& other)  {
-		if (other.dsubgroup1) {
-			dsubgroup1 = new Function(*(other.dsubgroup1));
-			dsubgroup2 = new Function(*(other.dsubgroup2));
-		}
 		for (unsigned int i = 0; i < other.fcount; i++) {
 			addFunc(other.functions[i]->Copy());
 		}
@@ -482,16 +470,19 @@ public:
 	void addComposite(){}
 
 	double evaluate(double x) const {
-		double total = 0;
-		if (addMode)
-			for (unsigned int i = 0; i < fcount; i++)
-				if (i != 0)
-					total += functions[i]->evaluate(x);
-		else
-			for (unsigned int i = 0; i < fcount; i++)
-				if (i != 0)
-					total *= functions[i]->evaluate(x);
-		return total;
+		if (addMode) {
+			double total = 0;
+			for (unsigned int i = 0; i < fcount; i++) 
+				total += functions[i]->evaluate(x);
+			return total;
+		}
+		else {
+			double total = 1;
+			for (unsigned int i = 0; i < fcount; i++) 
+				total *= functions[i]->evaluate(x);
+			return total;
+		}
+		
 	}
 
 	std::string toString() const {
@@ -514,30 +505,32 @@ public:
 	}
 
 	Function* differentiate() {
-		derivative = new Function();
-
+		Function* derivative = new Function;
 		if (addMode) {
 			for(unsigned int i = 0; i < fcount; i++)
 				derivative->addFunc(functions[i]->differentiate());
 			return derivative;
 		}
 		else {
-			if (fcount == 2 && !differentiated) {
-				differentiated = true;
-				dsubgroup1 = new Function();
-				dsubgroup1->addFunc(functions[0]->differentiate());
-				dsubgroup1->addFunc(functions[1]->Copy());
-				dsubgroup1->addMode = false;
-				dsubgroup2 = new Function();
-				dsubgroup2->addFunc(functions[1]->differentiate());
-				dsubgroup2->addFunc(functions[0]->Copy());
-				dsubgroup2->addMode = false;
-				derivative->addFunc(dsubgroup1);
-				derivative->addFunc(dsubgroup2);
+				Function* dgroupsptr = new Function[fcount];
+				Function* tempptr = dgroupsptr;
+				for (unsigned int i = 0; i < fcount; i++) {
+					for (unsigned int j = 0; j < fcount; j++) {
+						if (i == j) 
+							dgroupsptr->addFunc(functions[j]->differentiate());
+							
+						else 
+							dgroupsptr->addFunc(functions[j]->Copy());
+
+					}
+					dgroupsptr->addMode = false;
+					derivative->addFunc(dgroupsptr->Copy());
+					dgroupsptr++;
+				}
+				dgroupsptr = tempptr;
+				delete [] dgroupsptr;
+				dgroupsptr = 0;
 				return derivative;
-			}
-			else
-				throw std::exception();
 		}
 	}
 
@@ -606,8 +599,9 @@ struct Calculus {
 }; 
 
 int main()
-{ 
+{
 	return 0;
 }
+
 
 
