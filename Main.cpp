@@ -2,10 +2,9 @@
 #include <math.h>
 #include <string>
 #include <array>
-constexpr double PI = 3.14159265358979;
+constexpr double PI = 3.1415926535897932;
+constexpr double e = 2.7182818284590451;
 constexpr double NaN = ((static_cast<double>(INFINITY)) * 0);
-
-static int funcdeletions = 0;
 
 struct Vector2D {
 
@@ -85,8 +84,8 @@ struct Vector3D {
 
 struct FuncBase {
 	virtual double evaluate(double x) const = 0;
-	virtual FuncBase* differentiate() = 0;
-	virtual FuncBase* antiDifferentiate() = 0;
+	virtual FuncBase* differentiate() const = 0;
+	virtual FuncBase* antiDifferentiate() const = 0;
 	virtual FuncBase* Copy() = 0;
 	virtual std::string toString() const = 0;
 	virtual ~FuncBase() = 0;
@@ -94,8 +93,8 @@ struct FuncBase {
 
 FuncBase::~FuncBase() {}
 
-struct Function : public FuncBase{
-private:
+struct Function : public FuncBase {
+
 	struct Monomial : public FuncBase {
 		double coefficient, power;
 
@@ -131,15 +130,17 @@ private:
 				return -INFINITY;
 			else if (fmod(abs(power), 2) == 0 && x < 0)
 				return NaN;
+			else if (power == 0)
+				return coefficient;
 			else
 				return coefficient * pow(x, power);
 		}
 
-		FuncBase* differentiate() {
+		FuncBase* differentiate() const {
 			return new Monomial(coefficient * power, power - 1);
 		}
 
-		FuncBase* antiDifferentiate() {
+		FuncBase* antiDifferentiate() const {
 			return new Monomial(coefficient / (power+1), power + 1);
 		}
 
@@ -167,42 +168,25 @@ private:
 		double evaluate(double x) const {
 			return coefficient * pow(base, x);
 		}
-		FuncBase* differentiate() {
+		FuncBase* differentiate() const {
 			return new Exponential(coefficient * log(base), base);
 		}
 
-		FuncBase* antiDifferentiate() {
+		FuncBase* antiDifferentiate() const {
 			return new Exponential(coefficient / log(base), base);
 		}
 	};
 
 	struct Logarithm : public FuncBase {
 		double coefficient;
-		Function* fptr1 = 0;
-		Function* fptr2 = 0;
-		Function* tempptr = 0;
-		bool antiDifferentiated = false;
-
+		
 		Logarithm(double c) : coefficient(c) {
 			
 		}
 
-		~Logarithm() {
-			if (antiDifferentiated) {
-				fptr1 = 0;
-				fptr2 = 0;
-				tempptr = 0;
-			}
-		}
+		~Logarithm() {}
 		
-		Logarithm(const Logarithm& other) : coefficient(other.coefficient){
-			antiDifferentiated = other.antiDifferentiated;
-			if (fptr1) {
-				fptr1 = new Function(*(other.fptr1));
-				fptr2 = new Function(*(other.fptr2));
-				tempptr = new Function(*(other.tempptr));
-			}
-		}
+		Logarithm(const Logarithm& other) : coefficient(other.coefficient){}
 
 		FuncBase* Copy() {
 			return new Logarithm(*this);
@@ -219,26 +203,22 @@ private:
 			return coefficient * log(x);
 		}
 
-		FuncBase* differentiate() {
+		FuncBase* differentiate() const {
 			return new Monomial(1, -1);
 		}
 
-		FuncBase* antiDifferentiate() {
-			if (!antiDifferentiated) {
-				antiDifferentiated = true;
-				fptr1 = new Function();
-				fptr1->addMode = false;
-				fptr1->addMonomial(1, 1);
-				fptr1->addLogarithm(1);
-				fptr2 = new Function();
-				fptr2->addMonomial(-1, 1);
-				tempptr = new Function();
-				tempptr->addFunc(fptr1);
-				tempptr->addFunc(fptr2);
-				return tempptr;
-			}
-			else
-				return new Function(*tempptr);
+		FuncBase* antiDifferentiate() const {
+			Function* antiDerivative = new Function();
+			Function part1;
+			part1.addMode = false;
+			part1.addMonomial(1, 1);
+			part1.addLogarithm(1);
+			Function part2;
+			part2.addMonomial(-1, 1);
+			antiDerivative->addFunc(part1.Copy());
+			antiDerivative->addFunc(part2.Copy());
+			return antiDerivative;
+			
 		}
 	};
 
@@ -281,14 +261,14 @@ private:
 				return coefficient * cos(x);
 		}
 		
-		FuncBase* differentiate() {
+		FuncBase* differentiate() const {
 			if (type == 's')
 				return new Trigonmetric(1, 'c');
 			else
 				return new Trigonmetric(-1, 's');
 		}
 
-		FuncBase* antiDifferentiate() {
+		FuncBase* antiDifferentiate() const {
 			if (type == 's')
 				return new Trigonmetric(-1, 'c');
 			else
@@ -298,23 +278,12 @@ private:
 
 	struct AbsoluteValue : public FuncBase {
 		double coefficient;
-		bool differentiated = false;
-		bool antiDifferentiated = false;
-		Function* fptr1 = 0;
-		Function* fptr2 = 0;
-
+		
 		AbsoluteValue(double c) : coefficient(c) {}
 
-		~AbsoluteValue() {
-			if (differentiated)
-				fptr1 = 0;
-			if (antiDifferentiated)
-				fptr2 = 0;
-		}
+		~AbsoluteValue() {}
 
-		AbsoluteValue(const AbsoluteValue& other) : coefficient(other.coefficient){
-			
-		}
+		AbsoluteValue(const AbsoluteValue& other) : coefficient(other.coefficient){}
 
 		FuncBase* Copy() {
 			return new AbsoluteValue(*this);
@@ -331,72 +300,79 @@ private:
 			return coefficient * abs(x);
 		}
 
-		FuncBase* differentiate() {
-			if (!differentiated) {
-				differentiated = true;
-				fptr1 = new Function();
-				fptr1->addMode = false;
-				fptr1->addMonomial(1, -1);
-				fptr1->addAbsoluteValue(1);
-				return fptr1;
-			}
-			else
-				return new Function(*fptr1);
+		FuncBase* differentiate() const {
+			Function* derivative = new Function();
+			derivative->addMode = false;
+			derivative->addMonomial(1, -1);
+			derivative->addAbsoluteValue(1);
+			return derivative;
 		}
 
-		FuncBase* antiDifferentiate() {
-			if (!antiDifferentiated) {
-				antiDifferentiated = true;
-				fptr2 = new Function();
-				fptr2->addMode = false;
-				fptr2->addMonomial(.5, 1);
-				fptr2->addAbsoluteValue(1);
-				return fptr2;
-			}
-			else
-				return new Function(*fptr2);
+		FuncBase* antiDifferentiate() const {
+			Function* antiDerivative = new Function();
+			antiDerivative->addMode = false;
+			antiDerivative->addMonomial(.5, 1);
+			antiDerivative->addAbsoluteValue(1);
+			return antiDerivative;
 		}
 	};
 
-	//Composite Function is incomplete
-
-	struct CompositeSubFunction : public FuncBase { 
+	struct Composite : public FuncBase {
 		FuncBase* outer = 0;
 		FuncBase* inner = 0;
 
-		CompositeSubFunction(FuncBase* o, FuncBase* i) : outer(o), inner(i) {}
+		Composite(FuncBase* o, FuncBase* i) : outer(o), inner(i) {}
 
-		~CompositeSubFunction () {
-			//May or may not be useful later
+		~Composite() {
 			delete outer;
-			delete inner;
 			outer = 0;
+			delete inner;
 			inner = 0;
 		}
 
-		CompositeSubFunction(const CompositeSubFunction& other) {
+		std::string toString() const {
+			return "Not yet working!\n";
+		}
 
+		Composite(const Composite& other) {
+			outer = other.outer->Copy();
+			inner = other.outer->Copy();
+		}
+
+		FuncBase* Copy() {
+			return new Composite(*this);
 		}
 
 		double evaluate(double x) const {
 			return outer->evaluate(inner->evaluate(x));
 		}
+
+		FuncBase* differentiate() const {
+			Function* derivative = new Function();
+			derivative->addMode = false;
+			derivative->addComposite(outer->differentiate(), inner->Copy());
+			derivative->addFunc(inner->differentiate());
+			return derivative;
+		}
+
+		FuncBase* antiDifferentiate() const {
+			FuncBase* tempptr = inner->differentiate();
+			if (tempptr->evaluate(49.5415) == tempptr->evaluate(374.92687)) {
+				Function* antiDerivative = new Function();
+				antiDerivative->addMode = false;
+				antiDerivative->addComposite(outer->antiDifferentiate(), inner->Copy());
+				antiDerivative->addComposite(new Monomial(1, -1), inner->differentiate());
+				delete tempptr;
+				return antiDerivative;
+			}
+			else
+				throw std::exception();
+		}
 	};
 
-	void addFunc(FuncBase* func) {
-		if (fcount < 5) {
-			functions[fcount] = func;
-			fcount++;
-		}
-		else
-			std::cout << "This function is full!\n";
-	}
-	
-public:
 	std::array<FuncBase*, 5> functions;
 	unsigned int fcount = 0;
 	bool addMode = true; //False is multiply
-
 
 	Function() {
 		for (unsigned int i = 0; i < 5; i++)
@@ -404,11 +380,11 @@ public:
 	}
 
 	~Function() {
-	for (unsigned int i = 0; i < fcount; i++) 
-		if (functions[i] != 0) {
-			delete functions[i];
-			functions[i] = 0;
-		}				
+		for (unsigned int i = 0; i < fcount; i++)
+			if (functions[i] != 0) {
+				delete functions[i];
+				functions[i] = 0;
+			}
 	}
 
 	Function(const Function& other)  {
@@ -467,7 +443,23 @@ public:
 			std::cout << "This function is full!\n";
 	}
 
-	void addComposite(){}
+	void addFunc(FuncBase* func) {
+		if (fcount < 5) {
+			functions[fcount] = func;
+			fcount++;
+		}
+		else
+			std::cout << "This function is full!\n";
+	}
+
+	void addComposite(FuncBase* o, FuncBase* i){
+		if (fcount < 5) {
+			functions[fcount] = new Composite(o, i); //POSSIBLY PROBLEMATIC WITH "NEW"???
+			fcount++;
+		}
+		else
+			std::cout << "This function is full!\n";
+	}
 
 	double evaluate(double x) const {
 		if (addMode) {
@@ -504,7 +496,7 @@ public:
 		return output;
 	}
 
-	Function* differentiate() {
+	Function* differentiate() const {
 		Function* derivative = new Function;
 		if (addMode) {
 			for(unsigned int i = 0; i < fcount; i++)
@@ -512,31 +504,27 @@ public:
 			return derivative;
 		}
 		else {
-				Function* dgroupsptr = new Function[fcount];
-				Function* tempptr = dgroupsptr;
-				for (unsigned int i = 0; i < fcount; i++) {
-					for (unsigned int j = 0; j < fcount; j++) {
-						if (i == j) 
-							dgroupsptr->addFunc(functions[j]->differentiate());
-							
-						else 
-							dgroupsptr->addFunc(functions[j]->Copy());
-
-					}
-					dgroupsptr->addMode = false;
-					derivative->addFunc(dgroupsptr->Copy());
-					dgroupsptr++;
+			std::array<Function*, 5> dgroups;
+			for (unsigned int i = 0; i < fcount; i++) {
+				(dgroups)[i] = new Function();
+			}
+			for (unsigned int i = 0; i < fcount; i++) {
+				for (unsigned int j = 0; j < fcount; j++) {
+					if (i == j) 
+						(dgroups)[i]->addFunc(functions[j]->differentiate());	
+					else 
+						(dgroups)[i]->addFunc(functions[j]->Copy());
 				}
-				dgroupsptr = tempptr;
-				delete [] dgroupsptr;
-				dgroupsptr = 0;
-				return derivative;
+				(dgroups)[i]->addMode = false;
+				derivative->addFunc((dgroups)[i]); 
+			}
+			return derivative;
 		}
 	}
 
 	//ANTIDIFFERENTIATION NOT FULLY SUPPORTED
 
-	Function* antiDifferentiate(){
+	Function* antiDifferentiate() const {
 		Function* antiDerivative = new Function();
 		if (addMode) {
 			for (unsigned int i = 0; i < fcount; i++)
