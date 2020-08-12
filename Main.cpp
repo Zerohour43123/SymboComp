@@ -10,7 +10,7 @@ struct Vector2D {
 
 	double x, y, r, theta;
 
-	Vector2D(double x, double y) : x(x), y(y)  {
+	Vector2D(double x, double y) : x(x), y(y) {
 		r = sqrt(pow(x, 2) + pow(y, 2));
 		theta = (180 / PI) * atan2(y, x);
 	}
@@ -23,7 +23,7 @@ struct Vector2D {
 	Vector2D operator*(double scalar) const {
 		return Vector2D(x * scalar, y * scalar);
 	}
-	std::string toString () {
+	std::string toString() {
 		return "Component x: " + std::to_string(x) + ", Component y: " + std::to_string(y) + "\nMagnitude: " + std::to_string(r) + ", Angle theta: " + std::to_string(theta) + "\n";
 	}
 	double dotProduct(const Vector2D& input) const {
@@ -100,7 +100,7 @@ struct Function : public FuncBase {
 
 		Monomial(double c, double p) : coefficient(c), power(p) {}
 
-		~Monomial(){}
+		~Monomial() {}
 
 		Monomial(const Monomial& other) :coefficient(other.coefficient), power(other.power) {}
 
@@ -127,9 +127,7 @@ struct Function : public FuncBase {
 
 		double evaluate(double x) const {
 			if (power < 0 && x == 0)
-				return -INFINITY;
-			else if (fmod(abs(power), 2) == 0 && x < 0)
-				return NaN;
+				return INFINITY;
 			else if (power == 0)
 				return coefficient;
 			else
@@ -137,11 +135,17 @@ struct Function : public FuncBase {
 		}
 
 		FuncBase* differentiate() const {
-			return new Monomial(coefficient * power, power - 1);
+			if (power == 0)
+				return new Monomial(0, 0);
+			else
+				return new Monomial(coefficient * power, power - 1);
 		}
 
 		FuncBase* antiDifferentiate() const {
-			return new Monomial(coefficient / (power+1), power + 1);
+			if (power == -1)
+				return new Composite(new Logarithm(1), new AbsoluteValue(1));
+			else 
+				return new Monomial(coefficient / (power + 1), power + 1);
 		}
 
 	};
@@ -179,14 +183,14 @@ struct Function : public FuncBase {
 
 	struct Logarithm : public FuncBase {
 		double coefficient;
-		
+
 		Logarithm(double c) : coefficient(c) {
-			
+
 		}
 
 		~Logarithm() {}
-		
-		Logarithm(const Logarithm& other) : coefficient(other.coefficient){}
+
+		Logarithm(const Logarithm& other) : coefficient(other.coefficient) {}
 
 		FuncBase* Copy() {
 			return new Logarithm(*this);
@@ -218,7 +222,7 @@ struct Function : public FuncBase {
 			antiDerivative->addFunc(part1.Copy());
 			antiDerivative->addFunc(part2.Copy());
 			return antiDerivative;
-			
+
 		}
 	};
 
@@ -232,7 +236,7 @@ struct Function : public FuncBase {
 
 		~Trigonmetric() {}
 
-		Trigonmetric(const Trigonmetric& other) : coefficient(other.coefficient), type(other.type){}
+		Trigonmetric(const Trigonmetric& other) : coefficient(other.coefficient), type(other.type) {}
 
 		FuncBase* Copy() {
 			return new Trigonmetric(*this);
@@ -242,13 +246,13 @@ struct Function : public FuncBase {
 			if (coefficient == 1) {
 				if (type == 's')
 					return "sin(x)";
-				else 
+				else
 					return "cos(x)";
 			}
 			else
 				if (type == 's')
 					return std::to_string(coefficient) + "*sin(x)";
-				else 
+				else
 					return std::to_string(coefficient) + "*cos(x)";
 		}
 
@@ -260,7 +264,7 @@ struct Function : public FuncBase {
 			else
 				return coefficient * cos(x);
 		}
-		
+
 		FuncBase* differentiate() const {
 			if (type == 's')
 				return new Trigonmetric(1, 'c');
@@ -278,12 +282,12 @@ struct Function : public FuncBase {
 
 	struct AbsoluteValue : public FuncBase {
 		double coefficient;
-		
+
 		AbsoluteValue(double c) : coefficient(c) {}
 
 		~AbsoluteValue() {}
 
-		AbsoluteValue(const AbsoluteValue& other) : coefficient(other.coefficient){}
+		AbsoluteValue(const AbsoluteValue& other) : coefficient(other.coefficient) {}
 
 		FuncBase* Copy() {
 			return new AbsoluteValue(*this);
@@ -317,11 +321,13 @@ struct Function : public FuncBase {
 		}
 	};
 
+
 	struct Composite : public FuncBase {
 		FuncBase* outer = 0;
 		FuncBase* inner = 0;
 
-		Composite(FuncBase* o, FuncBase* i) : outer(o), inner(i) {}
+		Composite(FuncBase* o, FuncBase* i) : outer(o), inner(i) {
+		}
 
 		~Composite() {
 			delete outer;
@@ -331,7 +337,8 @@ struct Function : public FuncBase {
 		}
 
 		std::string toString() const {
-			return "Not yet working!\n";
+			int position = outer->toString().find("x");
+			return outer->toString().substr(0, position) + "(" + inner->toString() + ")" + outer->toString().substr(position + 1);
 		}
 
 		Composite(const Composite& other) {
@@ -369,6 +376,7 @@ struct Function : public FuncBase {
 				throw std::exception();
 		}
 	};
+	
 
 	std::array<FuncBase*, 5> functions;
 	unsigned int fcount = 0;
@@ -380,6 +388,7 @@ struct Function : public FuncBase {
 	}
 
 	~Function() {
+
 		for (unsigned int i = 0; i < fcount; i++)
 			if (functions[i] != 0) {
 				delete functions[i];
@@ -387,7 +396,7 @@ struct Function : public FuncBase {
 			}
 	}
 
-	Function(const Function& other)  {
+	Function(const Function& other) {
 		for (unsigned int i = 0; i < other.fcount; i++) {
 			addFunc(other.functions[i]->Copy());
 		}
@@ -400,7 +409,7 @@ struct Function : public FuncBase {
 
 	void addMonomial(double c, double p) {
 		if (fcount < 5) {
-			functions[fcount] = new Monomial(c,p);
+			functions[fcount] = new Monomial(c, p);
 			fcount++;
 		}
 		else
@@ -427,14 +436,14 @@ struct Function : public FuncBase {
 
 	void addTrigonmetric(double c, char t) {
 		if (fcount < 5) {
-			functions[fcount] = new Trigonmetric(c,t);
+			functions[fcount] = new Trigonmetric(c, t);
 			fcount++;
 		}
 		else
 			std::cout << "This function is full!\n";
 	}
 
-	void addAbsoluteValue(double c){
+	void addAbsoluteValue(double c) {
 		if (fcount < 5) {
 			functions[fcount] = new AbsoluteValue(c);
 			fcount++;
@@ -464,22 +473,22 @@ struct Function : public FuncBase {
 	double evaluate(double x) const {
 		if (addMode) {
 			double total = 0;
-			for (unsigned int i = 0; i < fcount; i++) 
+			for (unsigned int i = 0; i < fcount; i++)
 				total += functions[i]->evaluate(x);
 			return total;
 		}
 		else {
 			double total = 1;
-			for (unsigned int i = 0; i < fcount; i++) 
+			for (unsigned int i = 0; i < fcount; i++)
 				total *= functions[i]->evaluate(x);
 			return total;
 		}
-		
+
 	}
 
 	std::string toString() const {
 		std::string output;
-		if (addMode) 
+		if (addMode)
 			for (unsigned int i = 0; i < fcount; i++) {
 				if (i != 0)
 					output += "+" + functions[i]->toString();
@@ -499,7 +508,7 @@ struct Function : public FuncBase {
 	Function* differentiate() const {
 		Function* derivative = new Function;
 		if (addMode) {
-			for(unsigned int i = 0; i < fcount; i++)
+			for (unsigned int i = 0; i < fcount; i++)
 				derivative->addFunc(functions[i]->differentiate());
 			return derivative;
 		}
@@ -510,13 +519,13 @@ struct Function : public FuncBase {
 			}
 			for (unsigned int i = 0; i < fcount; i++) {
 				for (unsigned int j = 0; j < fcount; j++) {
-					if (i == j) 
-						(dgroups)[i]->addFunc(functions[j]->differentiate());	
-					else 
+					if (i == j)
+						(dgroups)[i]->addFunc(functions[j]->differentiate());
+					else
 						(dgroups)[i]->addFunc(functions[j]->Copy());
 				}
 				(dgroups)[i]->addMode = false;
-				derivative->addFunc((dgroups)[i]); 
+				derivative->addFunc((dgroups)[i]);
 			}
 			return derivative;
 		}
@@ -540,20 +549,89 @@ struct Function : public FuncBase {
 
 struct Calculus {
 
-	static double Limit(const Function& func, double x) {
+	static double Integrate(const FuncBase& func, double a, double b, bool PV) {
+		double sum = -4444444;
+		double c = 0;
+		bool improper1 = false;
+		bool improper2 = false;
+		bool improper3 = false;
+		FuncBase* antiDerivative = func.antiDifferentiate();
+		if (isinf(a) || isinf(b))
+			improper1 = true;
+		if (isinf(func.evaluate(a)) || isinf(func.evaluate(b)))
+			improper2 = true;
+		if (!improper1) {
+			for (double i = a + 1; i < b; i++) {
+				if (isinf(func.evaluate(i))) {
+					if (improper2)
+						throw std::exception("Integral must not have discontinuities at the bounds and in the middle!");
+					else {
+						improper3 = true;
+						c = i;
+						break;
+					}
+				}
+			}
+		}
+
+		/*if (improper1 && improper3) {
+			if (isinf(a) && isinf(b))
+				sum = (LeftLimit(*antiDerivative, c) - Limit(*antiDerivative, a)) + (Limit(*antiDerivative,b) - RightLimit(*antiDerivative, c));
+			else if(!isinf(a))
+				sum = (LeftLimit(*antiDerivative, c) - antiDerivative->evaluate(a)) + (Limit(*antiDerivative, b) - RightLimit(*antiDerivative, c));
+			else
+				sum = (LeftLimit(*antiDerivative, c) - Limit(*antiDerivative, a)) + (antiDerivative->evaluate(b) - RightLimit(*antiDerivative, c));
+		}
+		else */if (improper1) {
+			if (isinf(a) && isinf(b) && PV)
+				sum = (Limit(*antiDerivative, b) - Limit(*antiDerivative, a));
+			else if (isinf(a) && isinf(b))
+				sum = (antiDerivative->evaluate(0) - Limit(*antiDerivative, a)) + (Limit(*antiDerivative, b) - antiDerivative->evaluate(0));
+			else if (!isinf(a))
+				sum = (Limit(*antiDerivative, b) - antiDerivative->evaluate(a));
+			else
+				sum = (antiDerivative->evaluate(b) - Limit(*antiDerivative, a));
+		}
+		else if (improper2) {
+			if (isinf(func.evaluate(a)) && isinf(func.evaluate(b)) && PV)
+				sum = -3333333;
+			else if (isinf(func.evaluate(a)) && isinf(func.evaluate(b)))
+				sum = (antiDerivative->evaluate((b - a) / 2) - RightLimit(*antiDerivative, a)) + (LeftLimit(*antiDerivative, b) - antiDerivative->evaluate((b - a) / 2));
+			else if (!isinf(func.evaluate(a)))
+				sum = (LeftLimit(*antiDerivative, b) - antiDerivative->evaluate(a));
+			else 	
+				sum = (antiDerivative->evaluate(b) - LeftLimit(*antiDerivative, a));
+		}
+		else if (improper3) {
+			sum = (LeftLimit(*antiDerivative, c) - antiDerivative->evaluate(a)) + (antiDerivative->evaluate(b) - RightLimit(*antiDerivative, c));
+		}
+		else
+			sum = (antiDerivative->evaluate(b) - antiDerivative->evaluate(a)); 
+
+		delete antiDerivative;
+		antiDerivative = 0;
+		return sum;
+	}
+
+	static double Limit(const FuncBase& func, double x) {
 		double evaluation = func.evaluate(x);
 		if (isnan(evaluation))
 			return nan("Complex!");
 		else if (isinf(x) && isinf(evaluation))
 			return evaluation;
 		else if (!isinf(x) && isinf(evaluation)) {
-			return 0;
+			double leftval = LeftLimit(func, x);
+			double rightval = RightLimit(func, x);
+			if (leftval == rightval)
+				return leftval;
+			else
+				return NaN;
 		}
 		else
 			return evaluation;
 	};
 
-	static double LeftLimit(const Function& func, double x) {
+	static double LeftLimit(const FuncBase& func, double x) {
 		double evaluation = func.evaluate(x);
 		if (isinf(x))
 			throw std::runtime_error("Left limit of " + std::to_string(x) + " is not possible!");
@@ -569,7 +647,7 @@ struct Calculus {
 			return evaluation;
 	}
 
-	static double RightLimit(const Function& func, double x) {
+	static double RightLimit(const FuncBase& func, double x) {
 		double evaluation = func.evaluate(x);
 		if (isinf(x))
 			throw std::runtime_error("Right limit of " + std::to_string(x) + " is not possible!");
@@ -584,12 +662,8 @@ struct Calculus {
 		else
 			return evaluation;
 	}
-}; 
+};
 
-int main()
-{
-	return 0;
-}
 
 
 
